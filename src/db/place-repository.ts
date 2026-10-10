@@ -16,8 +16,16 @@ const DEFAULT_RESULT_LIMIT = 200;
 const MAX_RESULT_LIMIT = 500;
 const MAX_QUERY_LENGTH = 200; // Maximum search query length to prevent performance issues
 
-// Whitelist of valid place type filters to prevent SQL injection
-const VALID_PLACE_TYPE_FILTERS: readonly PlaceTypeFilter[] = ['all', 'State', 'Region', 'District', 'Township', 'Town', 'Ward', 'village', 'town'];
+// Whitelist of valid place type filters to prevent SQL injection.
+// Values must match the canonical SQLite type strings used in the bundled dataset.
+const VALID_PLACE_TYPE_FILTERS: readonly PlaceTypeFilter[] = [
+  'all',
+  'town',
+  'ward',
+  'village_tract',
+  'village',
+  'postal',
+];
 
 function validatePlaceTypeFilter(type: PlaceTypeFilter): PlaceTypeFilter {
   if (!VALID_PLACE_TYPE_FILTERS.includes(type)) {

@@ -42,6 +42,13 @@ describe('buildPlaceSearchSql', () => {
     expect(sql).toContain('AND type = ?');
   });
 
+  it('accepts the ward filter and includes the requested type filter', () => {
+    const { sql, parameters } = buildPlaceSearchSql('Yangon', 'ward', 25);
+
+    expect(sql).toContain('AND type = ?');
+    expect(parameters).toContain('ward');
+  });
+
   it('rejects invalid place type filter', () => {
     expect(() => buildPlaceSearchSql('Yangon', 'invalid_type' as any)).toThrow(
       'Invalid place type filter',
