@@ -1,0 +1,49 @@
+# Dependencies and Expo-generated files
+node_modules/
+.expo/
+dist/
+web-build/
+coverage/
+expo-env.d.ts
+
+# Local environment and editor state
+.env
+.env.*
+!.env.example
+.DS_Store
+.idea/
+.vscode/*.log
+*.iml
+*.log
+*.tsbuildinfo
+
+# Android build output and local SDK/signing files
+**/build/
+.gradle/
+.kotlin/
+.cxx/
+local.properties
+*.hprof
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# iOS build output and local signing files
+Pods/
+DerivedData/
+*.ipa
+*.mobileprovision
+*.p8
+*.p12
+*.key
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+*.xccheckout
+*.moved-aside
+.xcode.env.local
+
+# Generated native bundles
+*.jsbundle
+*.orig.*
