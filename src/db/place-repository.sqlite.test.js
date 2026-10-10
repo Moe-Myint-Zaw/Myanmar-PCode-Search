@@ -102,6 +102,27 @@ describe('SQLite place repository integration', () => {
     expect(spacedResults.map((place) => place.postal_code)).toEqual(['11221', '11229']);
   });
 
+  it('searches the packaged dataset by postal code with the postal filter selected', async () => {
+    const packagedDatabase = new DatabaseSync(
+      resolve(process.cwd(), 'assets/database/myanmar_pcode.db'),
+    );
+    const packagedRepository = {
+      getAllAsync: async (sql, parameters) => packagedDatabase.prepare(sql).all(...parameters),
+    };
+
+    try {
+      const exactResults = await searchPlaces(packagedRepository, '0101200', 'postal');
+      const partialResults = await searchPlaces(packagedRepository, '01012', 'postal');
+
+      expect(exactResults.map((place) => place.pcode)).toContain('MMR001001001');
+      expect(exactResults.every((place) => place.postal_code !== null)).toBe(true);
+      expect(partialResults.length).toBeGreaterThan(0);
+      expect(partialResults.every((place) => place.postal_code !== null)).toBe(true);
+    } finally {
+      packagedDatabase.close();
+    }
+  });
+
   it('searches Myanmar normalized names and preserves useful indexes', async () => {
     const results = await searchPlaces(repositoryDatabase, 'ရန်ကုန်');
     const indexes = sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'index'").all().map(({ name }) => name);

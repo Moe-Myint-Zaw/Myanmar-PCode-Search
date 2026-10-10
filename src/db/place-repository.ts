@@ -52,7 +52,12 @@ export function buildPlaceSearchSql(
   const pcodeQuery = normalizedQuery.replace(/\s+/g, '');
   const safeLimit = Math.max(1, Math.min(Math.floor(limit), MAX_RESULT_LIMIT));
   const supportsTrigramSearch = Array.from(normalizedQuery).length >= 3;
-  const typeClause = validatedType === 'all' ? '' : 'AND type = ?';
+  const typeClause =
+    validatedType === 'all'
+      ? ''
+      : validatedType === 'postal'
+        ? "AND postal_code_normalized != ''"
+        : 'AND type = ?';
   const substringQuery = `%${normalizedQuery}%`;
   const candidateQueries = ['SELECT id FROM places WHERE pcode_normalized = ?'];
   const candidateParameters: (string | number)[] = [pcodeQuery];
@@ -88,7 +93,9 @@ export function buildPlaceSearchSql(
     );
     candidateParameters.push(substringQuery, substringQuery, substringQuery);
   }
-  if (validatedType !== 'all') candidateParameters.push(validatedType);
+  if (validatedType !== 'all' && validatedType !== 'postal') {
+    candidateParameters.push(validatedType);
+  }
 
   return {
     sql: `SELECT * FROM places

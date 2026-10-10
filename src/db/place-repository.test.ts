@@ -49,6 +49,15 @@ describe('buildPlaceSearchSql', () => {
     expect(parameters).toContain('ward');
   });
 
+  it('filters postal searches to records that have postal codes', () => {
+    const { sql, parameters } = buildPlaceSearchSql('01012', 'postal', 25);
+
+    expect(sql).toContain("AND postal_code_normalized != ''");
+    expect(sql).not.toContain('AND type = ?');
+    expect(parameters).not.toContain('postal');
+    expect((sql.match(/\?/g) ?? []).length).toBe(parameters.length);
+  });
+
   it('rejects invalid place type filter', () => {
     expect(() => buildPlaceSearchSql('Yangon', 'invalid_type' as any)).toThrow(
       'Invalid place type filter',
