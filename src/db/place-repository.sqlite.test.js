@@ -159,6 +159,25 @@ describe('SQLite place repository integration', () => {
     }
   });
 
+  it('searches packaged village tracts by name when the village-tract filter is selected', async () => {
+    const packagedDatabase = new DatabaseSync(
+      resolve(process.cwd(), 'assets/database/myanmar_pcode.db'),
+    );
+    const packagedRepository = {
+      getAllAsync: async (sql, parameters) => packagedDatabase.prepare(sql).all(...parameters),
+    };
+
+    try {
+      const results = await searchPlaces(packagedRepository, 'Alam', 'village_tract');
+
+      expect(results.length).toBeGreaterThan(0);
+      expect(results.every((place) => place.type === 'village_tract')).toBe(true);
+      expect(results.some((place) => place.name_eng === 'Alam')).toBe(true);
+    } finally {
+      packagedDatabase.close();
+    }
+  });
+
   it('returns every State/Region in the packaged dataset with coordinate-derived map bounds', async () => {
     const packagedDatabase = new DatabaseSync(
       resolve(process.cwd(), 'assets/database/myanmar_pcode.db'),
