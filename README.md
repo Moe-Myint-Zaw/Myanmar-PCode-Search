@@ -69,6 +69,8 @@ The prepared compact dataset (`data/pcode-compact.json`) and bundled database (`
 
 The default map style is OpenFreeMap Liberty. `EXPO_PUBLIC_MAP_STYLE_URL` replaces the style; offline downloads for a custom provider remain disabled unless its terms and attribution have been reviewed and `EXPO_PUBLIC_MAP_OFFLINE_DOWNLOADS_ENABLED=true` is set. Setting that flag to `false` disables downloads. A trusted HTTPS dataset update endpoint can optionally be set with `EXPO_PUBLIC_DATASET_UPDATE_URL`.
 
+Place details can request an online driving route from the device's current GPS location. The default routing endpoint is the public OSRM demo server, which has no availability guarantee; configure `EXPO_PUBLIC_ROUTING_API_URL` to use a managed OSRM-compatible routing service. Route requests share the requested origin and destination coordinates with that endpoint and are unavailable offline.
+
 ## Directory structure
 
 ```text

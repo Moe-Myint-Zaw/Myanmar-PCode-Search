@@ -9,6 +9,7 @@ type MapPlaceCardProps = {
   place: PlaceRecord | null;
   loading: boolean;
   error: string | null;
+  bottomOffset?: number;
   onPress: (place: PlaceRecord) => void;
   onDismiss: () => void;
 };
@@ -17,6 +18,7 @@ export function MapPlaceCard({
   place,
   loading,
   error,
+  bottomOffset = spacing.sm,
   onPress,
   onDismiss,
 }: MapPlaceCardProps) {
@@ -24,7 +26,7 @@ export function MapPlaceCard({
 
   if (!place) {
     return (
-      <View style={styles.card} accessibilityLiveRegion="polite">
+      <View style={[styles.card, { bottom: bottomOffset }]} accessibilityLiveRegion="polite">
         <View style={styles.message}>
           <AppText variant="small" weight="semibold">
             {loading ? 'Loading place details…' : 'Place details unavailable'}
@@ -46,7 +48,7 @@ export function MapPlaceCard({
   const title = place.name_eng ?? place.name_mmr ?? place.pcode;
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { bottom: bottomOffset }]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Open details for ${title}`}

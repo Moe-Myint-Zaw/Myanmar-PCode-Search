@@ -1,6 +1,6 @@
 import type * as Location from 'expo-location';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
-import { MapPin, MapPinned, Wifi, WifiOff } from 'lucide-react-native';
+import { MapPin, MapPinned, Navigation, Wifi, WifiOff } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Switch, View } from 'react-native';
 
@@ -18,6 +18,7 @@ import { getOfflineCoverageState, isViewportCovered } from '@/map/coverage';
 import { MAP_OFFLINE_DOWNLOADS_ENABLED, MAP_STYLE_URL } from '@/map/map-config';
 import { listOfflinePacks, setMapNetworkEnabled, type OfflinePackSummary } from '@/map/offline-map-service';
 import { getCurrentCoordinates, watchCurrentCoordinates } from '@/services/location-service';
+import { getDrivingRoute, type DrivingRoute } from '@/services/routing-service';
 import { colors, radius, spacing } from '@/theme';
 import { AppError } from '@/types/errors';
 import type { Coordinates, PlaceRecord } from '@/types/pcode';
@@ -25,8 +26,22 @@ import { parseCoordinates } from '@/utils/coordinates';
 
 const MYANMAR_CENTER: Coordinates = { latitude: 19.5, longitude: 96.1 };
 
+function formatRouteDistance(meters: number): string {
+  return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
+}
+
+function formatRouteDuration(seconds: number): string {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes > 0 ? `${hours} hr ${remainingMinutes} min` : `${hours} hr`;
+  }
+  return `${minutes} min`;
+}
+
 export default function MapScreen() {
-  const params = useLocalSearchParams<{ lat?: string; lng?: string; pcode?: string }>();
+  const params = useLocalSearchParams<{ lat?: string; lng?: string; pcode?: string; route?: string }>();
   const { database, state: databaseState } = useAppDatabase();
   const isFocused = useIsFocused();
   const online = useNetworkStatus();
@@ -34,6 +49,10 @@ export default function MapScreen() {
     typeof params.lat === 'string' && typeof params.lng === 'string'
       ? parseCoordinates(`${params.lat},${params.lng}`)
       : null;
+  const routeRequested = params.route === '1';
+  const routeDestinationKey = routeRequested && routePoint
+    ? `${params.pcode ?? ''}:${routePoint.latitude},${routePoint.longitude}`
+    : null;
   const [packs, setPacks] = useState<OfflinePackSummary[]>([]);
   const [viewport, setViewport] = useState<[number, number, number, number] | null>(null);
   const [packLoading, setPackLoading] = useState(true);
@@ -41,9 +60,28 @@ export default function MapScreen() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [gpsLocation, setGpsLocation] = useState<Coordinates | null>(null);
+  const [routeRequest, setRouteRequest] = useState<{
+    key: string;
+    route: DrivingRoute | null;
+    loading: boolean;
+    error: string | null;
+  } | null>(null);
+  const [routeRetry, setRouteRetry] = useState(0);
   const [gpsCenter, setGpsCenter] = useState<Coordinates | null>(null);
   const [locationWatchRetry, setLocationWatchRetry] = useState(0);
   const locationPermissionRequested = useRef(false);
+  const routeAttemptedKey = useRef<string | null>(null);
+  const gpsLocationRef = useRef(gpsLocation);
+  const routePointRef = useRef(routePoint);
+  const routeRequestKey = routeDestinationKey ? `${routeDestinationKey}:${routeRetry}` : null;
+  const routeResult = routeRequest?.key === routeRequestKey ? routeRequest.route : null;
+  const routeLoading = routeRequest?.key === routeRequestKey && routeRequest.loading;
+  const routeError = routeRequest?.key === routeRequestKey
+    ? routeRequest.error
+    : routeRequested && online === false
+      ? 'Connect to the internet to calculate a driving route.'
+      : null;
+  const gpsAvailable = gpsLocation !== null;
   const [offlineOnly, setOfflineOnly] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<PlaceRecord | null>(null);
   const [placeLookupLoading, setPlaceLookupLoading] = useState(false);
@@ -97,6 +135,51 @@ export default function MapScreen() {
       subscription?.remove();
     };
   }, [isFocused, locationWatchRetry]);
+
+  useEffect(() => {
+    gpsLocationRef.current = gpsLocation;
+    routePointRef.current = routePoint;
+  }, [gpsLocation, routePoint]);
+
+  useEffect(() => {
+    if (!isFocused || !routeRequestKey || online !== true) return;
+    const origin = gpsLocationRef.current;
+    const destination = routePointRef.current;
+    if (!origin || !destination || routeAttemptedKey.current === routeRequestKey) return;
+
+    routeAttemptedKey.current = routeRequestKey;
+    const controller = new AbortController();
+    let active = true;
+    let settled = false;
+
+    void Promise.resolve().then(async () => {
+      if (!active) return;
+      setRouteRequest({ key: routeRequestKey, route: null, loading: true, error: null });
+      try {
+        const route = await getDrivingRoute(origin, destination, controller.signal);
+        settled = true;
+        if (active) setRouteRequest({ key: routeRequestKey, route, loading: false, error: null });
+      } catch (error) {
+        settled = true;
+        if (active && !controller.signal.aborted) {
+          setRouteRequest({
+            key: routeRequestKey,
+            route: null,
+            loading: false,
+            error: error instanceof AppError ? error.message : 'Driving route could not be calculated.',
+          });
+        }
+      }
+    });
+
+    return () => {
+      active = false;
+      controller.abort();
+      if (!settled && routeAttemptedKey.current === routeRequestKey) {
+        routeAttemptedKey.current = null;
+      }
+    };
+  }, [gpsAvailable, isFocused, online, routeRequestKey]);
 
   useEffect(() => {
     setMapNetworkEnabled(online === true && !offlineOnly);
@@ -216,6 +299,7 @@ export default function MapScreen() {
             center={center}
             marker={routePoint}
             currentLocation={gpsLocation}
+            route={routeResult}
             selectedPlace={selectedPlace}
             isPlaceLoading={placeLookupLoading}
             placeError={placeLookupError}
@@ -239,6 +323,41 @@ export default function MapScreen() {
           </View>
         )}
       </View>
+      {routeRequested ? (
+        routeLoading ? (
+          <Notice
+            title="Calculating driving route"
+            detail="Finding a road route from your current location to this place."
+            tone="neutral"
+            icon={Navigation}
+          />
+        ) : routeResult ? (
+          <Notice
+            title={`Driving route · ${formatRouteDistance(routeResult.distanceMeters)}`}
+            detail={`About ${formatRouteDuration(routeResult.durationSeconds)} from your current location.`}
+            tone="success"
+            icon={Navigation}
+          />
+        ) : routeError ? (
+          <View style={{ gap: spacing.sm }}>
+            <Notice title="Route unavailable" detail={routeError} tone="warning" icon={Navigation} />
+            {online === true ? (
+              <ActionButton
+                label="Retry route"
+                icon={Navigation}
+                onPress={() => setRouteRetry((retry) => retry + 1)}
+              />
+            ) : null}
+          </View>
+        ) : (
+          <Notice
+            title="Waiting for current location"
+            detail="A GPS fix is needed before calculating the route."
+            tone="neutral"
+            icon={Navigation}
+          />
+        )
+      ) : null}
       <Notice
         title={online === null ? 'Checking connection' : online ? 'Map can request online tiles' : 'Map network requests disabled'}
         detail={

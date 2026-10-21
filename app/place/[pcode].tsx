@@ -1,6 +1,6 @@
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Copy, MapPin, Navigation } from 'lucide-react-native';
+import { Copy, MapPin, Navigation, Route } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
@@ -173,6 +173,21 @@ export default function PlaceDetailScreen() {
                 router.push({
                   pathname: '/(tabs)/map',
                   params: { lat: String(place.lat), lng: String(place.lng), pcode: place.pcode },
+                })
+              }
+            />
+            <ActionButton
+              label="Show route"
+              icon={Route}
+              onPress={() =>
+                router.push({
+                  pathname: '/(tabs)/map',
+                  params: {
+                    lat: String(place.lat),
+                    lng: String(place.lng),
+                    pcode: place.pcode,
+                    route: '1',
+                  },
                 })
               }
             />

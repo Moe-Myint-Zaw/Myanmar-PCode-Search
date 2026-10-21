@@ -1,5 +1,5 @@
-import { MapPin, MoveUpRight } from 'lucide-react-native';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { LocateFixed, MapPin, MoveUpRight } from 'lucide-react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { MapPlaceCard } from '@/components/map-place-card';
@@ -9,16 +9,36 @@ import type { MapSurfaceProps } from './map-surface';
 export function MapSurface({
   center,
   currentLocation,
+  overlayBottomInset = 0,
   selectedPlace,
   isPlaceLoading = false,
+  isCurrentLocationLoading = false,
   placeError = null,
   onCoordinatePress,
+  onCurrentLocationPress,
   onPlacePress,
   onDismissPlace,
 }: MapSurfaceProps) {
   return (
     <View style={styles.surface}>
       <View style={styles.grid} />
+      {onCurrentLocationPress ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go to current location"
+          accessibilityHint="Centers the map on your current GPS location"
+          accessibilityState={{ busy: isCurrentLocationLoading }}
+          disabled={isCurrentLocationLoading}
+          onPress={onCurrentLocationPress}
+          style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}
+        >
+          {isCurrentLocationLoading ? (
+            <ActivityIndicator size="small" color={colors.forest} />
+          ) : (
+            <LocateFixed size={22} color={colors.ink} />
+          )}
+        </Pressable>
+      ) : null}
       <View style={styles.centerMark}>
         <MapPin
           size={23}
@@ -30,6 +50,7 @@ export function MapSurface({
         place={selectedPlace ?? null}
         loading={isPlaceLoading}
         error={placeError}
+        bottomOffset={overlayBottomInset + (onCurrentLocationPress ? spacing.md + 48 + spacing.sm : spacing.sm)}
         onPress={(place) => onPlacePress?.(place)}
         onDismiss={() => onDismissPlace?.()}
       />
@@ -82,6 +103,21 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderColor: '#B9C9BB',
   },
+  locationButton: {
+    position: 'absolute',
+    right: spacing.md,
+    bottom: spacing.md,
+    zIndex: 1,
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+  },
+  pressed: { opacity: 0.72 },
   centerMark: {
     width: 50,
     height: 50,

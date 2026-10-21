@@ -1,7 +1,7 @@
 import type { CameraRef } from '@maplibre/maplibre-react-native';
-import { MapPin, Minus, Plus } from 'lucide-react-native';
+import { LocateFixed, MapPin, Minus, Plus } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { MapPlaceCard } from '@/components/map-place-card';
@@ -20,10 +20,14 @@ export function MapSurface({
   center,
   marker,
   currentLocation,
+  route,
+  overlayBottomInset = 0,
   selectedPlace,
   isPlaceLoading = false,
+  isCurrentLocationLoading = false,
   placeError = null,
   onCoordinatePress,
+  onCurrentLocationPress,
   onPinPress,
   onPlacePress,
   onDismissPlace,
@@ -39,6 +43,37 @@ export function MapSurface({
     camera.current?.flyTo({ center: [center.longitude, center.latitude], duration: 450 });
   }, [center.latitude, center.longitude]);
 
+  useEffect(() => {
+    if (!route || route.coordinates.length < 2) return;
+    const firstCoordinate = route.coordinates[0]!;
+    const bounds = route.coordinates.reduce(
+      (current, [longitude, latitude]) => ({
+        west: Math.min(current.west, longitude),
+        south: Math.min(current.south, latitude),
+        east: Math.max(current.east, longitude),
+        north: Math.max(current.north, latitude),
+      }),
+      {
+        west: firstCoordinate[0],
+        south: firstCoordinate[1],
+        east: firstCoordinate[0],
+        north: firstCoordinate[1],
+      },
+    );
+    camera.current?.fitBounds(
+      [bounds.west, bounds.south, bounds.east, bounds.north],
+      {
+        padding: {
+          top: spacing.xl,
+          right: spacing.xl,
+          bottom: overlayBottomInset + spacing.xl,
+          left: spacing.xl,
+        },
+        duration: 800,
+      },
+    );
+  }, [overlayBottomInset, route]);
+
   if (!MAP_STYLE_URL) return null;
   if (!mapLibre) {
     return (
@@ -52,7 +87,7 @@ export function MapSurface({
     );
   }
 
-  const { Camera, Map, Marker } = mapLibre;
+  const { Camera, GeoJSONSource, Layer, Map, Marker } = mapLibre;
 
   return (
     <View style={styles.container}>
@@ -85,6 +120,29 @@ export function MapSurface({
           maxZoom={MAX_ZOOM}
           initialViewState={{ center: [center.longitude, center.latitude], zoom: INITIAL_ZOOM }}
         />
+        {route ? (
+          <GeoJSONSource
+            id="search-route-source"
+            data={{
+              type: 'Feature',
+              properties: {},
+              geometry: { type: 'LineString', coordinates: route.coordinates },
+            }}
+          >
+            <Layer
+              id="search-route-casing"
+              type="line"
+              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+              paint={{ 'line-color': colors.white, 'line-width': 9, 'line-opacity': 0.9 }}
+            />
+            <Layer
+              id="search-route-line"
+              type="line"
+              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+              paint={{ 'line-color': '#4285F4', 'line-width': 5, 'line-opacity': 1 }}
+            />
+          </GeoJSONSource>
+        ) : null}
         {mapStyleLoaded && marker ? (
           <Marker
             lngLat={[marker.longitude, marker.latitude]}
@@ -107,10 +165,32 @@ export function MapSurface({
           </Marker>
         ) : null}
       </Map>
+      {onCurrentLocationPress ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go to current location"
+          accessibilityHint="Centers the map on your current GPS location"
+          accessibilityState={{ busy: isCurrentLocationLoading }}
+          disabled={isCurrentLocationLoading}
+          onPress={onCurrentLocationPress}
+          style={({ pressed }) => [
+            styles.locationButton,
+            { bottom: overlayBottomInset + spacing.md },
+            pressed && styles.zoomButtonInactive,
+          ]}
+        >
+          {isCurrentLocationLoading ? (
+            <ActivityIndicator size="small" color={colors.forest} />
+          ) : (
+            <LocateFixed size={22} color={colors.ink} />
+          )}
+        </Pressable>
+      ) : null}
       <MapPlaceCard
         place={selectedPlace ?? null}
         loading={isPlaceLoading}
         error={placeError}
+        bottomOffset={overlayBottomInset + (onCurrentLocationPress ? spacing.md + 48 + spacing.sm : spacing.sm)}
         onPress={(place) => onPlacePress?.(place)}
         onDismiss={() => onDismissPlace?.()}
       />
@@ -149,7 +229,11 @@ export function MapSurface({
           accessibilityLabel="Search this point"
           accessibilityHint="Find nearby places around the point selected on the map"
           onPress={() => onCoordinatePress(selectedPoint)}
-          style={({ pressed }) => [styles.searchPointButton, pressed && styles.zoomButtonInactive]}
+          style={({ pressed }) => [
+            styles.searchPointButton,
+            { bottom: overlayBottomInset + spacing.md + 48 + spacing.sm },
+            pressed && styles.zoomButtonInactive,
+          ]}
         >
           <MapPin size={17} color={colors.white} />
           <AppText variant="small" weight="semibold" style={{ color: colors.white }}>
@@ -193,6 +277,24 @@ const styles = StyleSheet.create({
     top: spacing.md,
     right: spacing.md,
     overflow: 'hidden',
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    elevation: 3,
+    shadowColor: colors.ink,
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  locationButton: {
+    position: 'absolute',
+    right: spacing.md,
+    bottom: spacing.md,
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: radius.control,
     borderWidth: 1,
     borderColor: colors.line,
